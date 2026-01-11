@@ -202,7 +202,24 @@ ComposeSpec compose = ComposeBuilder.create()
 
 - JDK 17+
 - Docker CLI installed and available in PATH
-- Docker daemon running (Docker Desktop, Colima, Podman, etc.)
+- Docker daemon running
+
+## Runtime Compatibility
+
+The library automatically detects and works with Docker-compatible runtimes:
+
+| Runtime | Status | Notes |
+|---------|--------|-------|
+| Docker Engine | Tested | Full support |
+| Docker Desktop | Tested | Full support (macOS, Windows, Linux) |
+| Colima | Supported | Uses `docker` CLI |
+| OrbStack | Supported | Uses `docker` CLI |
+| Rancher Desktop | Supported | Uses `docker` CLI (dockerd mode) |
+| Podman | Supported | Alias `docker=podman` or use native detection |
+
+The library detects the runtime via `docker context show` and configures socket paths automatically. For Podman, you can either:
+- Use the alias: `alias docker=podman` (recommended by Podman docs)
+- Let the library detect Podman natively and use the `podman` command
 
 ## Documentation
 
