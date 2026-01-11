@@ -171,9 +171,11 @@ class DockerAlternativesIntegrationTest {
         println("=== END DOCKER INFO ===")
 
         assertEquals(0, output.exitCode, "docker info should succeed: ${output.stderr}")
+        // Docker returns "Server" / "Containers", Podman returns YAML with "host:" / "version:"
         assertTrue(
-            output.stdout.contains("Server") || output.stdout.contains("Containers"),
-            "Should return docker info output"
+            output.stdout.contains("Server") || output.stdout.contains("Containers") ||
+                    output.stdout.contains("host:") || output.stdout.contains("version:"),
+            "Should return info output (Docker or Podman format)"
         )
     }
 
