@@ -158,6 +158,18 @@ class DockerAlternativesIntegrationTest {
     @Order(6)
     fun `docker info works`() = runBlocking {
         val output = executor.execute(listOf("info"))
+
+        // Diagnostic output to see what CI returns
+        println("=== DOCKER INFO OUTPUT ===")
+        println("Exit code: ${output.exitCode}")
+        println("Stdout length: ${output.stdout.length}")
+        println("Stderr length: ${output.stderr.length}")
+        println("--- STDOUT (first 1000 chars) ---")
+        println(output.stdout.take(1000))
+        println("--- STDERR ---")
+        println(output.stderr)
+        println("=== END DOCKER INFO ===")
+
         assertEquals(0, output.exitCode, "docker info should succeed: ${output.stderr}")
         assertTrue(
             output.stdout.contains("Server") || output.stdout.contains("Containers"),
