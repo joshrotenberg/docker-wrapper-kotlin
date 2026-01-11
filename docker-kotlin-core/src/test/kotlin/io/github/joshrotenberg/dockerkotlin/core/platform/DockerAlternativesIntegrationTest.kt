@@ -157,17 +157,25 @@ class DockerAlternativesIntegrationTest {
     @Test
     @Order(6)
     fun `docker info works`() = runBlocking {
-        // Use simple format that works across Docker versions
-        val output = executor.execute(listOf("info", "--format", "{{.OSType}}"))
+        // Just verify the command runs without error - don't check specific format output
+        // as it may vary across Docker versions and environments
+        val output = executor.execute(listOf("info"))
         assertEquals(0, output.exitCode, "docker info should succeed: ${output.stderr}")
-        assertTrue(output.stdout.isNotBlank(), "Should return OS type")
+        // Info output should contain some basic fields
+        assertTrue(
+            output.stdout.contains("Containers") || output.stdout.contains("Server"),
+            "Should return docker info output"
+        )
     }
 
     @Test
     @Order(7)
     fun `docker version works`() = runBlocking {
-        val output = executor.execute(listOf("version", "--format", "{{.Client.Version}}"))
+        val output = executor.execute(listOf("version"))
         assertEquals(0, output.exitCode, "docker version should succeed")
-        assertTrue(output.stdout.isNotBlank(), "Should return client version")
+        assertTrue(
+            output.stdout.contains("Client") || output.stdout.contains("Version"),
+            "Should return docker version output"
+        )
     }
 }
