@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
+import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -24,7 +25,7 @@ import kotlin.test.assertTrue
  * Integration tests that verify compatibility with Docker-compatible runtimes.
  *
  * These tests run actual Docker commands against whatever runtime is configured.
- * They are tagged with "integration" so they can be run separately from unit tests.
+ * They are tagged with "integration" and only run when Docker is available.
  *
  * Compatible runtimes (all use `docker` CLI or alias):
  * - Docker Engine / Docker Desktop
@@ -36,6 +37,7 @@ import kotlin.test.assertTrue
  * Run with: ./gradlew :docker-kotlin-core:test --tests "*IntegrationTest"
  */
 @Tag("integration")
+@EnabledIf("isDockerAvailable")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class DockerAlternativesIntegrationTest {
@@ -48,6 +50,16 @@ class DockerAlternativesIntegrationTest {
         private const val TEST_CONTAINER = "docker-kotlin-integration-test"
         private const val TEST_NETWORK = "docker-kotlin-integration-network"
         private const val TEST_VOLUME = "docker-kotlin-integration-volume"
+
+        @JvmStatic
+        fun isDockerAvailable(): Boolean {
+            return runCatching {
+                ProcessBuilder("docker", "version")
+                    .redirectErrorStream(true)
+                    .start()
+                    .waitFor() == 0
+            }.getOrDefault(false)
+        }
     }
 
     @BeforeAll

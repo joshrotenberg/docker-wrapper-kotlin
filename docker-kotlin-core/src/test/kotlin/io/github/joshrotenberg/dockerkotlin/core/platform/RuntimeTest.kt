@@ -1,14 +1,25 @@
 package io.github.joshrotenberg.dockerkotlin.core.platform
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
-import org.junit.jupiter.api.condition.EnabledOnOs
-import org.junit.jupiter.api.condition.OS
+import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class RuntimeTest {
+
+    companion object {
+        @JvmStatic
+        fun isDockerAvailable(): Boolean {
+            return runCatching {
+                ProcessBuilder("docker", "version")
+                    .redirectErrorStream(true)
+                    .start()
+                    .waitFor() == 0
+            }.getOrDefault(false)
+        }
+    }
 
     @Test
     fun `Runtime enum has expected values`() {
@@ -32,6 +43,7 @@ class RuntimeTest {
     }
 
     @Test
+    @EnabledIf("isDockerAvailable")
     fun `detect returns a valid runtime`() {
         val runtime = Runtime.detect()
         assertNotNull(runtime)
@@ -39,6 +51,8 @@ class RuntimeTest {
     }
 
     @Test
+    @Tag("integration")
+    @EnabledIf("isDockerAvailable")
     fun `detected runtime command exists`() {
         val runtime = Runtime.detect()
         val result = runCatching {

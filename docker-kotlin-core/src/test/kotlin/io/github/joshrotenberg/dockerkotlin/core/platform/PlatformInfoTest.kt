@@ -1,6 +1,8 @@
 package io.github.joshrotenberg.dockerkotlin.core.platform
 
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -8,7 +10,20 @@ import kotlin.test.assertTrue
 
 class PlatformInfoTest {
 
+    companion object {
+        @JvmStatic
+        fun isDockerAvailable(): Boolean {
+            return runCatching {
+                ProcessBuilder("docker", "version")
+                    .redirectErrorStream(true)
+                    .start()
+                    .waitFor() == 0
+            }.getOrDefault(false)
+        }
+    }
+
     @Test
+    @EnabledIf("isDockerAvailable")
     fun `detect returns valid platform info`() {
         val info = PlatformInfo.detect()
 
@@ -30,6 +45,7 @@ class PlatformInfoTest {
     }
 
     @Test
+    @EnabledIf("isDockerAvailable")
     fun `socket path is detected on unix systems`() {
         val info = PlatformInfo.detect()
 
@@ -48,6 +64,7 @@ class PlatformInfoTest {
     }
 
     @Test
+    @EnabledIf("isDockerAvailable")
     fun `version is parseable`() {
         val info = PlatformInfo.detect()
 
@@ -59,6 +76,8 @@ class PlatformInfoTest {
     }
 
     @Test
+    @Tag("integration")
+    @EnabledIf("isDockerAvailable")
     fun `runtime command is executable`() {
         val info = PlatformInfo.detect()
 
