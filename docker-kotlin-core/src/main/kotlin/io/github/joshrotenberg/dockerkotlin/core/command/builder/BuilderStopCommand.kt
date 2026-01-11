@@ -2,11 +2,15 @@ package io.github.joshrotenberg.dockerkotlin.core.command.builder
 
 import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
 import io.github.joshrotenberg.dockerkotlin.core.command.AbstractDockerCommand
+import io.github.joshrotenberg.dockerkotlin.core.error.DockerException
 
 /**
  * Command to stop a builder instance.
  *
  * Equivalent to `docker builder stop` / `docker buildx stop`.
+ *
+ * Note: This command is not supported by Podman, which uses buildah
+ * and does not have the concept of multiple builder instances.
  *
  * Example usage:
  * ```kotlin
@@ -27,11 +31,22 @@ class BuilderStopCommand(
     }
 
     override suspend fun execute(): String {
+        checkRuntimeSupport()
         return executeRaw().stdout
     }
 
     override fun executeBlocking(): String {
+        checkRuntimeSupport()
         return executeRawBlocking().stdout
+    }
+
+    private fun checkRuntimeSupport() {
+        if (!executor.supportsBuilderCommand("stop")) {
+            throw DockerException.UnsupportedByRuntime(
+                command = "builder stop",
+                runtime = executor.runtime?.name ?: "unknown"
+            )
+        }
     }
 
     companion object {

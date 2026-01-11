@@ -1,9 +1,125 @@
 package io.github.joshrotenberg.dockerkotlin.core.command.builder
 
+import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
+import io.github.joshrotenberg.dockerkotlin.core.error.DockerException
+import io.github.joshrotenberg.dockerkotlin.core.platform.Platform
+import io.github.joshrotenberg.dockerkotlin.core.platform.PlatformInfo
+import io.github.joshrotenberg.dockerkotlin.core.platform.Runtime
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class BuilderCommandsTest {
+
+    private fun createPodmanExecutor(): CommandExecutor {
+        val podmanPlatformInfo = PlatformInfo(
+            runtime = Runtime.PODMAN,
+            version = "5.0.0",
+            platform = Platform.LINUX,
+            socketPath = null
+        )
+        return CommandExecutor(podmanPlatformInfo)
+    }
+
+    private fun createDockerExecutor(): CommandExecutor {
+        val dockerPlatformInfo = PlatformInfo(
+            runtime = Runtime.DOCKER_DESKTOP,
+            version = "24.0.0",
+            platform = Platform.MACOS,
+            socketPath = null
+        )
+        return CommandExecutor(dockerPlatformInfo)
+    }
+
+    // Runtime compatibility tests
+
+    @Test
+    fun `BuilderCreateCommand throws UnsupportedByRuntime on Podman`() {
+        val executor = createPodmanExecutor()
+        val command = BuilderCreateCommand(executor).name("test")
+
+        val exception = assertThrows<DockerException.UnsupportedByRuntime> {
+            command.executeBlocking()
+        }
+        assertEquals("builder create", exception.command)
+        assertEquals("PODMAN", exception.runtime)
+    }
+
+    @Test
+    fun `BuilderLsCommand throws UnsupportedByRuntime on Podman`() {
+        val executor = createPodmanExecutor()
+        val command = BuilderLsCommand(executor)
+
+        val exception = assertThrows<DockerException.UnsupportedByRuntime> {
+            command.executeBlocking()
+        }
+        assertEquals("builder ls", exception.command)
+        assertEquals("PODMAN", exception.runtime)
+    }
+
+    @Test
+    fun `BuilderRmCommand throws UnsupportedByRuntime on Podman`() {
+        val executor = createPodmanExecutor()
+        val command = BuilderRmCommand("test", executor)
+
+        val exception = assertThrows<DockerException.UnsupportedByRuntime> {
+            command.executeBlocking()
+        }
+        assertEquals("builder rm", exception.command)
+        assertEquals("PODMAN", exception.runtime)
+    }
+
+    @Test
+    fun `BuilderUseCommand throws UnsupportedByRuntime on Podman`() {
+        val executor = createPodmanExecutor()
+        val command = BuilderUseCommand("test", executor)
+
+        val exception = assertThrows<DockerException.UnsupportedByRuntime> {
+            command.executeBlocking()
+        }
+        assertEquals("builder use", exception.command)
+        assertEquals("PODMAN", exception.runtime)
+    }
+
+    @Test
+    fun `BuilderStopCommand throws UnsupportedByRuntime on Podman`() {
+        val executor = createPodmanExecutor()
+        val command = BuilderStopCommand("test", executor)
+
+        val exception = assertThrows<DockerException.UnsupportedByRuntime> {
+            command.executeBlocking()
+        }
+        assertEquals("builder stop", exception.command)
+        assertEquals("PODMAN", exception.runtime)
+    }
+
+    @Test
+    fun `CommandExecutor exposes runtime`() {
+        val podmanExecutor = createPodmanExecutor()
+        val dockerExecutor = createDockerExecutor()
+
+        assertEquals(Runtime.PODMAN, podmanExecutor.runtime)
+        assertEquals(Runtime.DOCKER_DESKTOP, dockerExecutor.runtime)
+    }
+
+    @Test
+    fun `CommandExecutor supportsBuilderCommand checks runtime`() {
+        val podmanExecutor = createPodmanExecutor()
+        val dockerExecutor = createDockerExecutor()
+
+        // Podman limitations
+        assertTrue(!podmanExecutor.supportsBuilderCommand("create"))
+        assertTrue(!podmanExecutor.supportsBuilderCommand("ls"))
+        assertTrue(podmanExecutor.supportsBuilderCommand("prune"))
+        assertTrue(podmanExecutor.supportsBuilderCommand("inspect"))
+
+        // Docker supports all
+        assertTrue(dockerExecutor.supportsBuilderCommand("create"))
+        assertTrue(dockerExecutor.supportsBuilderCommand("ls"))
+        assertTrue(dockerExecutor.supportsBuilderCommand("prune"))
+        assertTrue(dockerExecutor.supportsBuilderCommand("inspect"))
+    }
 
     // BuilderCreateCommand tests
 

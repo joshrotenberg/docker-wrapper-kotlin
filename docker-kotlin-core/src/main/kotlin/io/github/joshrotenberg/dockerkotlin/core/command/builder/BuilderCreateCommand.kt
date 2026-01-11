@@ -2,6 +2,7 @@ package io.github.joshrotenberg.dockerkotlin.core.command.builder
 
 import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
 import io.github.joshrotenberg.dockerkotlin.core.command.AbstractDockerCommand
+import io.github.joshrotenberg.dockerkotlin.core.error.DockerException
 
 /**
  * Command to create a new builder instance.
@@ -92,11 +93,22 @@ class BuilderCreateCommand(
     }
 
     override suspend fun execute(): String {
+        checkRuntimeSupport()
         return executeRaw().stdout.trim()
     }
 
     override fun executeBlocking(): String {
+        checkRuntimeSupport()
         return executeRawBlocking().stdout.trim()
+    }
+
+    private fun checkRuntimeSupport() {
+        if (!executor.supportsBuilderCommand("create")) {
+            throw DockerException.UnsupportedByRuntime(
+                command = "builder create",
+                runtime = executor.runtime?.name ?: "unknown"
+            )
+        }
     }
 
     companion object {

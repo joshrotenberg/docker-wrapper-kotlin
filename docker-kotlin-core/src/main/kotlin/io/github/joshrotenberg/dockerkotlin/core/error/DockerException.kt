@@ -85,4 +85,13 @@ sealed class DockerException(
         message: String,
         cause: Throwable? = null
     ) : DockerException(message, cause)
+
+    /**
+     * A command or feature is not supported by the current runtime.
+     */
+    class UnsupportedByRuntime(
+        val command: String,
+        val runtime: String,
+        message: String = "Command '$command' is not supported by $runtime"
+    ) : DockerException(message)
 }
