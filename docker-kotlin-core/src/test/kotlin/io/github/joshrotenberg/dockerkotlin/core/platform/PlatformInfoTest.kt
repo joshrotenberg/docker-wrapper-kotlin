@@ -13,11 +13,12 @@ class PlatformInfoTest {
     companion object {
         @JvmStatic
         fun isDockerAvailable(): Boolean {
+            // Check if Docker daemon is running, not just if CLI exists
             return runCatching {
-                ProcessBuilder("docker", "version")
+                val process = ProcessBuilder("docker", "info")
                     .redirectErrorStream(true)
                     .start()
-                    .waitFor() == 0
+                process.waitFor() == 0
             }.getOrDefault(false)
         }
     }
