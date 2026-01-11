@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "2.1.0" apply false
+    alias(libs.plugins.kotlin.jvm) apply false
     `java-library`
     `maven-publish`
 }
@@ -35,18 +35,13 @@ subprojects {
     }
 
     dependencies {
-        val coroutinesVersion = "1.9.0"
-        val slf4jVersion = "2.0.16"
-        val junitVersion = "5.11.4"
+        "implementation"(platform(rootProject.libs.coroutines.bom))
+        "implementation"(rootProject.libs.coroutines.core)
+        "implementation"(rootProject.libs.slf4j.api)
 
-        "implementation"(platform("org.jetbrains.kotlinx:kotlinx-coroutines-bom:$coroutinesVersion"))
-        "implementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core")
-        "implementation"("org.slf4j:slf4j-api:$slf4jVersion")
-
-        "testImplementation"(kotlin("test"))
-        "testImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-test")
-        "testImplementation"("org.junit.jupiter:junit-jupiter:$junitVersion")
-        "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
-        "testRuntimeOnly"("ch.qos.logback:logback-classic:1.5.12")
+        "testImplementation"(platform(rootProject.libs.junit.bom))
+        "testImplementation"(rootProject.libs.bundles.testing)
+        "testRuntimeOnly"(rootProject.libs.junit.platform.launcher)
+        "testRuntimeOnly"(rootProject.libs.logback.classic)
     }
 }

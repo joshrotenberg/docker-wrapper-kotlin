@@ -1,11 +1,11 @@
 plugins {
-    kotlin("jvm")
+    alias(libs.plugins.kotlin.jvm)
     `java-library`
 }
 
 description = "Core Docker CLI wrapper for Kotlin/JVM"
 
 dependencies {
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core")
-    api("org.slf4j:slf4j-api")
+    api(libs.coroutines.core)
+    api(libs.slf4j.api)
 }
