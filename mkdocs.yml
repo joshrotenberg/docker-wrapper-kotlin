@@ -102,6 +102,7 @@ nav:
   - Compose:
       - Overview: compose/overview.md
       - Commands: compose/commands.md
+      - DSL: compose/dsl.md
   - Templates:
       - Overview: container-templates/overview.md
       - Wait Strategies: container-templates/wait-strategies.md
