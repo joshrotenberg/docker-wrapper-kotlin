@@ -5,13 +5,17 @@ package io.github.joshrotenberg.dockerkotlin.core.platform
  */
 enum class Runtime(
     /** The CLI command to invoke this runtime. */
-    val command: String
+    val command: String,
+    /** Whether this runtime supports BuildKit builder instance management (create, ls, rm, use, stop). */
+    val supportsBuilderInstances: Boolean = true,
+    /** Whether this runtime uses Docker-compatible output formats. */
+    val dockerCompatibleOutput: Boolean = true
 ) {
     /** Standard Docker. */
     DOCKER("docker"),
 
-    /** Podman container runtime. */
-    PODMAN("podman"),
+    /** Podman container runtime. Uses buildah for builds, no builder instance management. */
+    PODMAN("podman", supportsBuilderInstances = false, dockerCompatibleOutput = false),
 
     /** Colima (macOS). */
     COLIMA("docker"),
@@ -24,6 +28,23 @@ enum class Runtime(
 
     /** Docker Desktop. */
     DOCKER_DESKTOP("docker");
+
+    /** Whether this is a Podman-based runtime. */
+    val isPodman: Boolean get() = this == PODMAN
+
+    /** Whether this is a Docker-based runtime (uses docker CLI). */
+    val isDocker: Boolean get() = command == "docker"
+
+    /**
+     * Check if a specific builder command is supported.
+     * Podman only supports: build, inspect, prune, version
+     * Docker supports all builder commands including instance management.
+     */
+    fun supportsBuilderCommand(subcommand: String): Boolean {
+        if (supportsBuilderInstances) return true
+        // Podman buildx only supports these commands
+        return subcommand in listOf("build", "inspect", "prune", "version")
+    }
 
     companion object {
         /**

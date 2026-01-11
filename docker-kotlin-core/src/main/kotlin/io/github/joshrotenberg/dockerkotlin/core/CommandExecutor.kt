@@ -19,9 +19,21 @@ class CommandExecutor(
 ) {
     private val logger = LoggerFactory.getLogger(CommandExecutor::class.java)
 
+    /** The detected runtime (Podman, Docker, etc.). */
+    val runtime get() = platformInfo?.runtime
+
     companion object {
         /** Default timeout for command execution. */
         val DEFAULT_TIMEOUT: Duration = 30.seconds
+    }
+
+    /**
+     * Check if a builder subcommand is supported by the current runtime.
+     * @param subcommand The builder subcommand (e.g., "create", "ls", "prune")
+     * @return true if supported, false otherwise
+     */
+    fun supportsBuilderCommand(subcommand: String): Boolean {
+        return runtime?.supportsBuilderCommand(subcommand) ?: true
     }
 
     /**

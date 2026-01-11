@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
+import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -24,7 +25,7 @@ import kotlin.test.assertTrue
  * Integration tests that verify compatibility with Docker-compatible runtimes.
  *
  * These tests run actual Docker commands against whatever runtime is configured.
- * They are tagged with "integration" so they can be run separately from unit tests.
+ * They are tagged with "integration" and only run when Docker is available.
  *
  * Compatible runtimes (all use `docker` CLI or alias):
  * - Docker Engine / Docker Desktop
@@ -36,6 +37,7 @@ import kotlin.test.assertTrue
  * Run with: ./gradlew :docker-kotlin-core:test --tests "*IntegrationTest"
  */
 @Tag("integration")
+@EnabledIf("isDockerAvailable")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class DockerAlternativesIntegrationTest {
@@ -48,6 +50,17 @@ class DockerAlternativesIntegrationTest {
         private const val TEST_CONTAINER = "docker-kotlin-integration-test"
         private const val TEST_NETWORK = "docker-kotlin-integration-network"
         private const val TEST_VOLUME = "docker-kotlin-integration-volume"
+
+        @JvmStatic
+        fun isDockerAvailable(): Boolean {
+            // Check if Docker daemon is running, not just if CLI exists
+            return runCatching {
+                val process = ProcessBuilder("docker", "info")
+                    .redirectErrorStream(true)
+                    .start()
+                process.waitFor() == 0
+            }.getOrDefault(false)
+        }
     }
 
     @BeforeAll
@@ -144,16 +157,36 @@ class DockerAlternativesIntegrationTest {
     @Test
     @Order(6)
     fun `docker info works`() = runBlocking {
-        val output = executor.execute(listOf("info", "--format", "{{.ServerVersion}}"))
-        assertEquals(0, output.exitCode, "docker info should succeed")
-        assertTrue(output.stdout.isNotBlank(), "Should return server version")
+        val output = executor.execute(listOf("info"))
+
+        // Diagnostic output to see what CI returns
+        println("=== DOCKER INFO OUTPUT ===")
+        println("Exit code: ${output.exitCode}")
+        println("Stdout length: ${output.stdout.length}")
+        println("Stderr length: ${output.stderr.length}")
+        println("--- STDOUT (first 1000 chars) ---")
+        println(output.stdout.take(1000))
+        println("--- STDERR ---")
+        println(output.stderr)
+        println("=== END DOCKER INFO ===")
+
+        assertEquals(0, output.exitCode, "docker info should succeed: ${output.stderr}")
+        // Docker returns "Server" / "Containers", Podman returns YAML with "host:" / "version:"
+        assertTrue(
+            output.stdout.contains("Server") || output.stdout.contains("Containers") ||
+                    output.stdout.contains("host:") || output.stdout.contains("version:"),
+            "Should return info output (Docker or Podman format)"
+        )
     }
 
     @Test
     @Order(7)
     fun `docker version works`() = runBlocking {
-        val output = executor.execute(listOf("version", "--format", "{{.Client.Version}}"))
+        val output = executor.execute(listOf("version"))
         assertEquals(0, output.exitCode, "docker version should succeed")
-        assertTrue(output.stdout.isNotBlank(), "Should return client version")
+        assertTrue(
+            output.stdout.contains("Client") || output.stdout.contains("Version"),
+            "Should return docker version output"
+        )
     }
 }
