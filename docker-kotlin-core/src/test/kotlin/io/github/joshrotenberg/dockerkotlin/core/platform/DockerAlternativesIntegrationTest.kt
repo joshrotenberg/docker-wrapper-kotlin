@@ -156,10 +156,33 @@ class DockerAlternativesIntegrationTest {
 
     @Test
     @Order(6)
+    fun `docker info diagnostic`() = runBlocking {
+        // Diagnostic test to understand CI behavior
+        val output = try {
+            executor.execute(listOf("info"))
+        } catch (e: Exception) {
+            println("=== DOCKER INFO EXCEPTION ===")
+            println("Exception type: ${e::class.simpleName}")
+            println("Message: ${e.message}")
+            throw e
+        }
+
+        println("=== DOCKER INFO OUTPUT ===")
+        println("Exit code: ${output.exitCode}")
+        println("Stdout length: ${output.stdout.length}")
+        println("Stderr length: ${output.stderr.length}")
+        println("--- STDOUT (first 500 chars) ---")
+        println(output.stdout.take(500))
+        println("--- STDERR ---")
+        println(output.stderr)
+        println("=== END DOCKER INFO ===")
+
+        assertEquals(0, output.exitCode, "docker info should succeed: ${output.stderr}")
+    }
+
+    @Test
+    @Order(7)
     fun `docker version works`() = runBlocking {
-        // Note: docker info is tested implicitly by the container operations above
-        // which require a running daemon. We use docker version here as it's more
-        // reliable across different CI environments.
         val output = executor.execute(listOf("version"))
         assertEquals(0, output.exitCode, "docker version should succeed")
         assertTrue(
