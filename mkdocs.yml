@@ -106,6 +106,8 @@ nav:
       - Overview: container-templates/overview.md
       - Wait Strategies: container-templates/wait-strategies.md
       - Redis: container-templates/redis.md
+  - Testing:
+      - Overview: testing/index.md
   - API Reference:
       - Core: api/core.md
       - Compose: api/compose.md
