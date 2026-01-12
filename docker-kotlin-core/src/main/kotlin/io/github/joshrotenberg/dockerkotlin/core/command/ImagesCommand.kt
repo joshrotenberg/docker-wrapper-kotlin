@@ -1,10 +1,15 @@
 package io.github.joshrotenberg.dockerkotlin.core.command
 
 import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
+import io.github.joshrotenberg.dockerkotlin.core.model.ImageSummary
+import kotlinx.serialization.json.Json
 
 /**
  * Represents an image from docker images output.
+ *
+ * @deprecated Use [ImageSummary] instead for typed JSON responses.
  */
+@Deprecated("Use ImageSummary instead", ReplaceWith("ImageSummary"))
 data class ImageInfo(
     val repository: String,
     val tag: String,
@@ -12,6 +17,8 @@ data class ImageInfo(
     val created: String,
     val size: String
 )
+
+private val json = Json { ignoreUnknownKeys = true }
 
 /**
  * Command to list images.
@@ -27,12 +34,12 @@ data class ImageInfo(
 class ImagesCommand(
     private val repository: String? = null,
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<List<ImageInfo>>(executor) {
+) : AbstractDockerCommand<List<ImageSummary>>(executor) {
 
     private var all: Boolean = false
     private var digests: Boolean = false
     private val filters = mutableListOf<String>()
-    private var format: String? = null
+    private var customFormat: String? = null
     private var noTrunc: Boolean = false
     private var quiet: Boolean = false
 
@@ -60,8 +67,8 @@ class ImagesCommand(
     /** Filter images created since given image. */
     fun filterSince(image: String) = filter("since=$image")
 
-    /** Format output using a Go template. */
-    fun format(format: String) = apply { this.format = format }
+    /** Format output using a Go template (overrides JSON output). */
+    fun format(format: String) = apply { this.customFormat = format }
 
     /** Don't truncate output. */
     fun noTrunc() = apply { this.noTrunc = true }
@@ -74,18 +81,23 @@ class ImagesCommand(
         if (all) add("--all")
         if (digests) add("--digests")
         filters.forEach { add("--filter"); add(it) }
-        format?.let { add("--format"); add(it) }
+        // Use JSON format unless custom format or quiet is specified
+        if (customFormat != null) {
+            add("--format"); add(customFormat!!)
+        } else if (!quiet) {
+            add("--format"); add("json")
+        }
         if (noTrunc) add("--no-trunc")
         if (quiet) add("--quiet")
         repository?.let { add(it) }
     }
 
-    override suspend fun execute(): List<ImageInfo> {
-        return parseOutput(executeRaw().stdout)
+    override suspend fun execute(): List<ImageSummary> {
+        return parseJsonOutput(executeRaw().stdout)
     }
 
-    override fun executeBlocking(): List<ImageInfo> {
-        return parseOutput(executeRawBlocking().stdout)
+    override fun executeBlocking(): List<ImageSummary> {
+        return parseJsonOutput(executeRawBlocking().stdout)
     }
 
     /**
@@ -110,21 +122,37 @@ class ImagesCommand(
         return output.stdout.lines().filter { it.isNotBlank() }.map { it.trim() }
     }
 
-    private fun parseOutput(stdout: String): List<ImageInfo> {
-        val lines = stdout.lines().filter { it.isNotBlank() }
-        if (lines.size <= 1) return emptyList()
+    /**
+     * Execute with custom format and return raw string output.
+     */
+    suspend fun executeRawFormat(format: String): String {
+        val originalFormat = customFormat
+        customFormat = format
+        val output = executeRaw()
+        customFormat = originalFormat
+        return output.stdout
+    }
 
-        return lines.drop(1).mapNotNull { line ->
-            val parts = line.split(Regex("\\s{2,}"))
-            if (parts.size >= 5) {
-                ImageInfo(
-                    repository = parts[0],
-                    tag = parts[1],
-                    imageId = parts[2],
-                    created = parts[3],
-                    size = parts[4]
-                )
-            } else null
+    /**
+     * Execute with custom format and return raw string output (blocking).
+     */
+    fun executeRawFormatBlocking(format: String): String {
+        val originalFormat = customFormat
+        customFormat = format
+        val output = executeRawBlocking()
+        customFormat = originalFormat
+        return output.stdout
+    }
+
+    private fun parseJsonOutput(stdout: String): List<ImageSummary> {
+        val lines = stdout.lines().filter { it.isNotBlank() }
+        if (lines.isEmpty()) return emptyList()
+
+        // Each line is a separate JSON object (NDJSON format)
+        return lines.mapNotNull { line ->
+            runCatching {
+                json.decodeFromString<ImageSummary>(line)
+            }.getOrNull()
         }
     }
 

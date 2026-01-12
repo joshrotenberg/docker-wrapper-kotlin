@@ -1,10 +1,15 @@
 package io.github.joshrotenberg.dockerkotlin.core.command
 
 import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
+import io.github.joshrotenberg.dockerkotlin.core.model.ContainerSummary
+import kotlinx.serialization.json.Json
 
 /**
  * Represents a container from docker ps output.
+ *
+ * @deprecated Use [ContainerSummary] instead for typed JSON responses.
  */
+@Deprecated("Use ContainerSummary instead", ReplaceWith("ContainerSummary"))
 data class ContainerInfo(
     val id: String,
     val image: String,
@@ -14,6 +19,8 @@ data class ContainerInfo(
     val ports: String,
     val names: String
 )
+
+private val json = Json { ignoreUnknownKeys = true }
 
 /**
  * Command to list containers.
@@ -28,11 +35,11 @@ data class ContainerInfo(
  */
 class PsCommand(
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<List<ContainerInfo>>(executor) {
+) : AbstractDockerCommand<List<ContainerSummary>>(executor) {
 
     private var all: Boolean = false
     private val filters = mutableListOf<String>()
-    private var format: String? = null
+    private var customFormat: String? = null
     private var last: Int? = null
     private var latest: Boolean = false
     private var noTrunc: Boolean = false
@@ -57,8 +64,8 @@ class PsCommand(
     /** Filter by label. */
     fun filterLabel(label: String) = filter("label=$label")
 
-    /** Pretty-print containers using a Go template. */
-    fun format(format: String) = apply { this.format = format }
+    /** Pretty-print containers using a Go template (overrides JSON output). */
+    fun format(format: String) = apply { this.customFormat = format }
 
     /** Show n last created containers (includes all states). */
     fun last(n: Int) = apply { this.last = n }
@@ -79,7 +86,12 @@ class PsCommand(
         add("ps")
         if (all) add("--all")
         filters.forEach { add("--filter"); add(it) }
-        format?.let { add("--format"); add(it) }
+        // Use JSON format unless custom format or quiet is specified
+        if (customFormat != null) {
+            add("--format"); add(customFormat!!)
+        } else if (!quiet) {
+            add("--format"); add("json")
+        }
         last?.let { add("--last"); add(it.toString()) }
         if (latest) add("--latest")
         if (noTrunc) add("--no-trunc")
@@ -87,12 +99,12 @@ class PsCommand(
         if (showSize) add("--size")
     }
 
-    override suspend fun execute(): List<ContainerInfo> {
-        return parseOutput(executeRaw().stdout)
+    override suspend fun execute(): List<ContainerSummary> {
+        return parseJsonOutput(executeRaw().stdout)
     }
 
-    override fun executeBlocking(): List<ContainerInfo> {
-        return parseOutput(executeRawBlocking().stdout)
+    override fun executeBlocking(): List<ContainerSummary> {
+        return parseJsonOutput(executeRawBlocking().stdout)
     }
 
     /**
@@ -117,31 +129,38 @@ class PsCommand(
         return output.stdout.lines().filter { it.isNotBlank() }.map { it.trim() }
     }
 
-    private fun parseOutput(stdout: String): List<ContainerInfo> {
-        val lines = stdout.lines().filter { it.isNotBlank() }
-        if (lines.size <= 1) return emptyList()
-
-        // Skip header line and parse containers
-        return lines.drop(1).mapNotNull { line ->
-            parseContainerLine(line)
-        }
+    /**
+     * Execute with custom format and return raw string output.
+     */
+    suspend fun executeRawFormat(format: String): String {
+        val originalFormat = customFormat
+        customFormat = format
+        val output = executeRaw()
+        customFormat = originalFormat
+        return output.stdout
     }
 
-    private fun parseContainerLine(line: String): ContainerInfo? {
-        // This is a simplified parser - docker ps output is space-aligned
-        // For proper parsing, use --format with JSON
-        val parts = line.split(Regex("\\s{2,}"))
-        return if (parts.size >= 7) {
-            ContainerInfo(
-                id = parts[0],
-                image = parts[1],
-                command = parts[2],
-                created = parts[3],
-                status = parts[4],
-                ports = parts.getOrElse(5) { "" },
-                names = parts.getOrElse(6) { "" }
-            )
-        } else null
+    /**
+     * Execute with custom format and return raw string output (blocking).
+     */
+    fun executeRawFormatBlocking(format: String): String {
+        val originalFormat = customFormat
+        customFormat = format
+        val output = executeRawBlocking()
+        customFormat = originalFormat
+        return output.stdout
+    }
+
+    private fun parseJsonOutput(stdout: String): List<ContainerSummary> {
+        val lines = stdout.lines().filter { it.isNotBlank() }
+        if (lines.isEmpty()) return emptyList()
+
+        // Each line is a separate JSON object (NDJSON format)
+        return lines.mapNotNull { line ->
+            runCatching {
+                json.decodeFromString<ContainerSummary>(line)
+            }.getOrNull()
+        }
     }
 
     companion object {

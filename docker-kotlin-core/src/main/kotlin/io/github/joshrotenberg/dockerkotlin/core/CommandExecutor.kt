@@ -4,9 +4,10 @@ import io.github.joshrotenberg.dockerkotlin.core.error.DockerException
 import io.github.joshrotenberg.dockerkotlin.core.platform.PlatformInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withTimeout
 import org.slf4j.LoggerFactory
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -57,15 +58,14 @@ class CommandExecutor(
 
         logger.debug("Executing: {} {}", runtime, args.joinToString(" "))
 
-        val result = withTimeoutOrNull(effectiveTimeout.inWholeMilliseconds) {
-            executeProcess(runtime, args)
-        }
-
-        if (result == null) {
+        try {
+            withTimeout(effectiveTimeout.inWholeMilliseconds) {
+                executeProcess(runtime, args)
+            }
+        } catch (e: TimeoutCancellationException) {
+            // TimeoutCancellationException is caught here after process cleanup in executeProcess
             throw DockerException.Timeout(effectiveTimeout)
         }
-
-        result
     }
 
     /**
@@ -150,8 +150,9 @@ class CommandExecutor(
 
             CommandOutput(stdout, stderr, exitCode)
         } catch (e: CancellationException) {
-            // Clean up process on cancellation
+            // Clean up process on cancellation (including timeout via withTimeoutOrNull)
             process.destroyForcibly()
+            process.waitFor() // Wait for process to actually terminate
             throw e
         }
     }

@@ -1,6 +1,10 @@
 package io.github.joshrotenberg.dockerkotlin.core.command
 
 import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
+import io.github.joshrotenberg.dockerkotlin.core.model.DockerInfo
+import kotlinx.serialization.json.Json
+
+private val json = Json { ignoreUnknownKeys = true }
 
 /**
  * Command to display system-wide information.
@@ -10,29 +14,25 @@ import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
  * Example usage:
  * ```kotlin
  * val info = InfoCommand().execute()
- * val serverVersion = InfoCommand().format("{{.ServerVersion}}").execute()
+ * println("Containers: ${info.containers}")
+ * println("Images: ${info.images}")
+ * println("Server Version: ${info.serverVersion}")
  * ```
  */
 class InfoCommand(
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<String>(executor) {
+) : AbstractDockerCommand<DockerInfo>(executor) {
 
-    private var format: String? = null
+    override fun buildArgs(): List<String> = listOf("info", "--format", "json")
 
-    /** Format output using a Go template. */
-    fun format(format: String) = apply { this.format = format }
-
-    override fun buildArgs(): List<String> = buildList {
-        add("info")
-        format?.let { add("--format"); add(it) }
+    override suspend fun execute(): DockerInfo {
+        val output = executeRaw()
+        return json.decodeFromString<DockerInfo>(output.stdout)
     }
 
-    override suspend fun execute(): String {
-        return executeRaw().stdout
-    }
-
-    override fun executeBlocking(): String {
-        return executeRawBlocking().stdout
+    override fun executeBlocking(): DockerInfo {
+        val output = executeRawBlocking()
+        return json.decodeFromString<DockerInfo>(output.stdout)
     }
 
     companion object {

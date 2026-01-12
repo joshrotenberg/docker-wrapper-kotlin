@@ -2,6 +2,10 @@ package io.github.joshrotenberg.dockerkotlin.core.command.network
 
 import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
 import io.github.joshrotenberg.dockerkotlin.core.command.AbstractDockerCommand
+import io.github.joshrotenberg.dockerkotlin.core.model.NetworkSummary
+import kotlinx.serialization.json.Json
+
+private val json = Json { ignoreUnknownKeys = true }
 
 /**
  * Command to list Docker networks.
@@ -10,17 +14,16 @@ import io.github.joshrotenberg.dockerkotlin.core.command.AbstractDockerCommand
  *
  * Example usage:
  * ```kotlin
- * NetworkLsCommand()
- *     .driverFilter("bridge")
- *     .executeBlocking()
+ * val networks = NetworkLsCommand().execute()
+ * val bridgeNetworks = NetworkLsCommand().driverFilter("bridge").execute()
  * ```
  */
 class NetworkLsCommand(
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<String>(executor) {
+) : AbstractDockerCommand<List<NetworkSummary>>(executor) {
 
     private val filters = mutableMapOf<String, String>()
-    private var format: String? = null
+    private var customFormat: String? = null
     private var noTrunc = false
     private var quiet = false
 
@@ -45,11 +48,8 @@ class NetworkLsCommand(
     /** Filter by type (custom or builtin). */
     fun typeFilter(type: String) = apply { filter("type", type) }
 
-    /** Set output format. */
-    fun format(format: String) = apply { this.format = format }
-
-    /** Format output as JSON. */
-    fun formatJson() = apply { format = "json" }
+    /** Set output format (overrides JSON output). */
+    fun format(format: String) = apply { this.customFormat = format }
 
     /** Don't truncate output. */
     fun noTrunc() = apply { noTrunc = true }
@@ -66,17 +66,77 @@ class NetworkLsCommand(
             add("$key=$value")
         }
 
-        format?.let { add("--format"); add(it) }
+        // Use JSON format unless custom format or quiet is specified
+        if (customFormat != null) {
+            add("--format"); add(customFormat!!)
+        } else if (!quiet) {
+            add("--format"); add("json")
+        }
         if (noTrunc) add("--no-trunc")
         if (quiet) add("--quiet")
     }
 
-    override suspend fun execute(): String {
-        return executeRaw().stdout
+    override suspend fun execute(): List<NetworkSummary> {
+        return parseJsonOutput(executeRaw().stdout)
     }
 
-    override fun executeBlocking(): String {
-        return executeRawBlocking().stdout
+    override fun executeBlocking(): List<NetworkSummary> {
+        return parseJsonOutput(executeRawBlocking().stdout)
+    }
+
+    /**
+     * Execute and return only network IDs.
+     */
+    suspend fun executeIds(): List<String> {
+        val originalQuiet = quiet
+        quiet = true
+        val output = executeRaw()
+        quiet = originalQuiet
+        return output.stdout.lines().filter { it.isNotBlank() }.map { it.trim() }
+    }
+
+    /**
+     * Execute and return only network IDs (blocking).
+     */
+    fun executeIdsBlocking(): List<String> {
+        val originalQuiet = quiet
+        quiet = true
+        val output = executeRawBlocking()
+        quiet = originalQuiet
+        return output.stdout.lines().filter { it.isNotBlank() }.map { it.trim() }
+    }
+
+    /**
+     * Execute with custom format and return raw string output.
+     */
+    suspend fun executeRawFormat(format: String): String {
+        val originalFormat = customFormat
+        customFormat = format
+        val output = executeRaw()
+        customFormat = originalFormat
+        return output.stdout
+    }
+
+    /**
+     * Execute with custom format and return raw string output (blocking).
+     */
+    fun executeRawFormatBlocking(format: String): String {
+        val originalFormat = customFormat
+        customFormat = format
+        val output = executeRawBlocking()
+        customFormat = originalFormat
+        return output.stdout
+    }
+
+    private fun parseJsonOutput(stdout: String): List<NetworkSummary> {
+        val lines = stdout.lines().filter { it.isNotBlank() }
+        if (lines.isEmpty()) return emptyList()
+
+        return lines.mapNotNull { line ->
+            runCatching {
+                json.decodeFromString<NetworkSummary>(line)
+            }.getOrNull()
+        }
     }
 
     companion object {

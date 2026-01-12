@@ -59,7 +59,12 @@ class VolumeCommandsTest {
     @Test
     fun `VolumeLsCommand buildArgs basic`() {
         val cmd = VolumeLsCommand()
-        assertEquals(listOf("volume", "ls"), cmd.buildArgs())
+        val args = cmd.buildArgs()
+        assertEquals("volume", args[0])
+        assertEquals("ls", args[1])
+        // Default format is json
+        assertTrue(args.contains("--format"))
+        assertTrue(args.contains("json"))
     }
 
     @Test
@@ -82,8 +87,16 @@ class VolumeCommandsTest {
     }
 
     @Test
-    fun `VolumeLsCommand buildArgs format json`() {
-        val cmd = VolumeLsCommand().formatJson()
+    fun `VolumeLsCommand buildArgs format custom`() {
+        val cmd = VolumeLsCommand().format("{{.Name}}")
+        val args = cmd.buildArgs()
+        assertTrue(args.contains("--format"))
+        assertTrue(args.contains("{{.Name}}"))
+    }
+
+    @Test
+    fun `VolumeLsCommand buildArgs default uses json format`() {
+        val cmd = VolumeLsCommand()
         val args = cmd.buildArgs()
         assertTrue(args.contains("--format"))
         assertTrue(args.contains("json"))

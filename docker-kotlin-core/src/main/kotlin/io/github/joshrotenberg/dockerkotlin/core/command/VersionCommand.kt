@@ -1,10 +1,15 @@
 package io.github.joshrotenberg.dockerkotlin.core.command
 
 import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
+import io.github.joshrotenberg.dockerkotlin.core.model.DockerVersion
+import kotlinx.serialization.json.Json
 
 /**
  * Docker version information.
+ *
+ * @deprecated Use [DockerVersion] instead for typed JSON responses.
  */
+@Deprecated("Use DockerVersion instead", ReplaceWith("DockerVersion"))
 data class VersionInfo(
     val clientVersion: String,
     val serverVersion: String?,
@@ -75,6 +80,8 @@ data class VersionInfo(
     }
 }
 
+private val json = Json { ignoreUnknownKeys = true }
+
 /**
  * Command to get Docker version information.
  *
@@ -83,30 +90,62 @@ data class VersionInfo(
  * Example usage (Kotlin):
  * ```kotlin
  * val version = VersionCommand().execute()
- * println("Client: ${version.clientVersion}")
- * println("Server: ${version.serverVersion}")
+ * println("Client: ${version.client.version}")
+ * println("Server: ${version.server?.version}")
  * ```
  *
  * Example usage (Java):
  * ```java
- * VersionInfo version = new VersionCommand().executeBlocking();
- * System.out.println("Client: " + version.getClientVersion());
+ * DockerVersion version = new VersionCommand().executeBlocking();
+ * System.out.println("Client: " + version.getClient().getVersion());
  * ```
  */
 class VersionCommand(
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<VersionInfo>(executor) {
+) : AbstractDockerCommand<DockerVersion>(executor) {
 
-    override fun buildArgs(): List<String> = listOf("version")
+    override fun buildArgs(): List<String> = listOf("version", "--format", "json")
 
-    override suspend fun execute(): VersionInfo {
+    override suspend fun execute(): DockerVersion {
         val output = executeRaw()
-        return VersionInfo.parse(output.stdout)
+        return json.decodeFromString<DockerVersion>(output.stdout)
     }
 
-    override fun executeBlocking(): VersionInfo {
+    override fun executeBlocking(): DockerVersion {
         val output = executeRawBlocking()
-        return VersionInfo.parse(output.stdout)
+        return json.decodeFromString<DockerVersion>(output.stdout)
+    }
+
+    /**
+     * Execute and return the legacy VersionInfo format.
+     */
+    @Deprecated("Use execute() instead", ReplaceWith("execute()"))
+    suspend fun executeLegacy(): VersionInfo {
+        val version = execute()
+        return VersionInfo(
+            clientVersion = version.client.version,
+            serverVersion = version.server?.version,
+            apiVersion = version.client.apiVersion,
+            goVersion = version.client.goVersion,
+            os = version.client.os,
+            arch = version.client.arch
+        )
+    }
+
+    /**
+     * Execute and return the legacy VersionInfo format (blocking).
+     */
+    @Deprecated("Use executeBlocking() instead", ReplaceWith("executeBlocking()"))
+    fun executeLegacyBlocking(): VersionInfo {
+        val version = executeBlocking()
+        return VersionInfo(
+            clientVersion = version.client.version,
+            serverVersion = version.server?.version,
+            apiVersion = version.client.apiVersion,
+            goVersion = version.client.goVersion,
+            os = version.client.os,
+            arch = version.client.arch
+        )
     }
 
     companion object {
