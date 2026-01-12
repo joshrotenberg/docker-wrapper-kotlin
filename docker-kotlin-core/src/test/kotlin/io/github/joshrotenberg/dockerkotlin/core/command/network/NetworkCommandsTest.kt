@@ -64,7 +64,12 @@ class NetworkCommandsTest {
     @Test
     fun `NetworkLsCommand buildArgs basic`() {
         val cmd = NetworkLsCommand()
-        assertEquals(listOf("network", "ls"), cmd.buildArgs())
+        val args = cmd.buildArgs()
+        assertEquals("network", args[0])
+        assertEquals("ls", args[1])
+        // Default format is json
+        assertTrue(args.contains("--format"))
+        assertTrue(args.contains("json"))
     }
 
     @Test
@@ -81,7 +86,15 @@ class NetworkCommandsTest {
 
     @Test
     fun `NetworkLsCommand buildArgs with format`() {
-        val cmd = NetworkLsCommand().formatJson()
+        val cmd = NetworkLsCommand().format("{{.Name}}")
+        val args = cmd.buildArgs()
+        assertTrue(args.contains("--format"))
+        assertTrue(args.contains("{{.Name}}"))
+    }
+
+    @Test
+    fun `NetworkLsCommand buildArgs default uses json format`() {
+        val cmd = NetworkLsCommand()
         val args = cmd.buildArgs()
         assertTrue(args.contains("--format"))
         assertTrue(args.contains("json"))

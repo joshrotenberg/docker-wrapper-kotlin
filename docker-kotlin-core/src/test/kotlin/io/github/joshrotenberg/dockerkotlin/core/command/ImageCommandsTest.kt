@@ -12,7 +12,11 @@ class ImageCommandsTest {
     @Test
     fun `ImagesCommand buildArgs basic`() {
         val cmd = ImagesCommand()
-        assertEquals(listOf("images"), cmd.buildArgs())
+        val args = cmd.buildArgs()
+        assertEquals("images", args[0])
+        // Default format is json
+        assertTrue(args.contains("--format"))
+        assertTrue(args.contains("json"))
     }
 
     @Test

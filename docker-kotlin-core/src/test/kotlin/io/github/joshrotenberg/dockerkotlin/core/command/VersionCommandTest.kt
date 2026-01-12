@@ -2,16 +2,21 @@ package io.github.joshrotenberg.dockerkotlin.core.command
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class VersionCommandTest {
 
     @Test
-    fun `buildArgs returns version command`() {
+    fun `buildArgs returns version command with json format`() {
         val cmd = VersionCommand()
-        assertEquals(listOf("version"), cmd.buildArgs())
+        val args = cmd.buildArgs()
+        assertEquals("version", args[0])
+        assertTrue(args.contains("--format"))
+        assertTrue(args.contains("json"))
     }
 
     @Test
+    @Suppress("DEPRECATION")
     fun `parse extracts version info from docker output`() {
         val output = """
             Client:
@@ -45,6 +50,7 @@ class VersionCommandTest {
     }
 
     @Test
+    @Suppress("DEPRECATION")
     fun `parse handles missing server info`() {
         val output = """
             Client:
