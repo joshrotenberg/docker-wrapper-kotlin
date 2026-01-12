@@ -5,10 +5,16 @@ import io.github.joshrotenberg.dockerkotlin.core.command.ContainerId
 import io.github.joshrotenberg.dockerkotlin.core.command.RmCommand
 import io.github.joshrotenberg.dockerkotlin.core.command.RunCommand
 import io.github.joshrotenberg.dockerkotlin.core.command.StopCommand
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.URL
 import java.util.UUID
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -314,18 +320,79 @@ abstract class AbstractTemplate(
     }
 
     protected open suspend fun checkPortReady(port: Int): Boolean {
-        // Default implementation - subclasses can override
-        return isRunning
+        if (!isRunning) return false
+
+        // Get the mapped host port for this container port
+        val hostPort = getMappedPort(port) ?: port
+
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                Socket().use { socket ->
+                    socket.connect(InetSocketAddress("localhost", hostPort), 1000)
+                    true
+                }
+            }.getOrDefault(false)
+        }
     }
 
     protected open suspend fun checkHttpReady(strategy: WaitStrategy.ForHttp): Boolean {
-        // Default implementation - subclasses can override
-        return isRunning
+        if (!isRunning) return false
+
+        // Get the mapped host port for this container port
+        val hostPort = getMappedPort(strategy.port) ?: strategy.port
+
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val url = URL("http://localhost:$hostPort${strategy.path}")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 1000
+                connection.readTimeout = 1000
+                connection.instanceFollowRedirects = false
+
+                try {
+                    connection.responseCode == strategy.statusCode
+                } finally {
+                    connection.disconnect()
+                }
+            }.getOrDefault(false)
+        }
     }
 
     protected open suspend fun checkLogReady(pattern: Regex): Boolean {
-        // Default implementation - subclasses can override
-        return isRunning
+        if (!isRunning) return false
+
+        // Check if log output matches the pattern
+        val id = _containerId ?: return false
+        return runCatching {
+            val output = executor.execute(listOf("logs", id.value))
+            pattern.containsMatchIn(output.stdout) || pattern.containsMatchIn(output.stderr)
+        }.getOrDefault(false)
+    }
+
+    /**
+     * Get the host port mapped to a container port.
+     * Returns null if no mapping exists or dynamic port discovery fails.
+     */
+    protected open suspend fun getMappedPort(containerPort: Int): Int? {
+        // Check static port mappings first
+        config.ports.entries.find { it.value == containerPort }?.let { return it.key }
+
+        // For dynamic ports, query Docker for the actual mapping
+        if (containerPort in config.dynamicPorts) {
+            val id = _containerId ?: return null
+            return runCatching {
+                val output = executor.execute(
+                    listOf("port", id.value, containerPort.toString())
+                )
+                // Output format: "0.0.0.0:32768" or "[::]:32768"
+                output.stdout.trim()
+                    .substringAfterLast(":")
+                    .toIntOrNull()
+            }.getOrNull()
+        }
+
+        return null
     }
 
     protected open suspend fun checkCommandReady(command: List<String>): Boolean {

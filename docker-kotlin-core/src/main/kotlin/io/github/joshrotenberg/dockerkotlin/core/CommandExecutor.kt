@@ -2,10 +2,14 @@ package io.github.joshrotenberg.dockerkotlin.core
 
 import io.github.joshrotenberg.dockerkotlin.core.error.DockerException
 import io.github.joshrotenberg.dockerkotlin.core.platform.PlatformInfo
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -91,19 +95,32 @@ class CommandExecutor(
 
         val process = processBuilder.start()
 
-        val completed = process.waitFor(effectiveTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-        if (!completed) {
-            process.destroyForcibly()
-            throw DockerException.Timeout(effectiveTimeout)
+        // Read stdout and stderr concurrently to avoid deadlock when buffers fill
+        val executor = Executors.newFixedThreadPool(2)
+        val stdoutFuture: Future<String> = executor.submit<String> {
+            process.inputStream.bufferedReader().readText()
+        }
+        val stderrFuture: Future<String> = executor.submit<String> {
+            process.errorStream.bufferedReader().readText()
         }
 
-        val stdout = process.inputStream.bufferedReader().readText()
-        val stderr = process.errorStream.bufferedReader().readText()
-        val exitCode = process.exitValue()
+        try {
+            val completed = process.waitFor(effectiveTimeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+            if (!completed) {
+                process.destroyForcibly()
+                throw DockerException.Timeout(effectiveTimeout)
+            }
 
-        logger.debug("Command completed with exit code {}", exitCode)
+            val stdout = stdoutFuture.get()
+            val stderr = stderrFuture.get()
+            val exitCode = process.exitValue()
 
-        return CommandOutput(stdout, stderr, exitCode)
+            logger.debug("Command completed with exit code {}", exitCode)
+
+            return CommandOutput(stdout, stderr, exitCode)
+        } finally {
+            executor.shutdown()
+        }
     }
 
     private suspend fun executeProcess(
@@ -120,12 +137,22 @@ class CommandExecutor(
 
         val process = processBuilder.start()
 
-        val stdout = process.inputStream.bufferedReader().readText()
-        val stderr = process.errorStream.bufferedReader().readText()
-        val exitCode = process.waitFor()
+        try {
+            // Read stdout and stderr concurrently to avoid deadlock when buffers fill
+            val stdoutDeferred = async { process.inputStream.bufferedReader().readText() }
+            val stderrDeferred = async { process.errorStream.bufferedReader().readText() }
 
-        logger.debug("Command completed with exit code {}", exitCode)
+            val stdout = stdoutDeferred.await()
+            val stderr = stderrDeferred.await()
+            val exitCode = process.waitFor()
 
-        CommandOutput(stdout, stderr, exitCode)
+            logger.debug("Command completed with exit code {}", exitCode)
+
+            CommandOutput(stdout, stderr, exitCode)
+        } catch (e: CancellationException) {
+            // Clean up process on cancellation
+            process.destroyForcibly()
+            throw e
+        }
     }
 }

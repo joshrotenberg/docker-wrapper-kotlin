@@ -91,7 +91,7 @@ class RedisTemplate(
     override val image: String = "redis"
     override val tag: String get() = config.version
 
-    private var mappedPort: Int? = null
+    private var cachedMappedPort: Int? = null
 
     init {
         // Set default wait strategy
@@ -196,9 +196,56 @@ class RedisTemplate(
 
     /**
      * Get the mapped host port.
+     * For dynamic ports, queries Docker for the actual mapping.
+     */
+    suspend fun discoverMappedPort(): Int {
+        // Return cached value if available
+        cachedMappedPort?.let { return it }
+
+        // Return static mapping if configured
+        config.hostPort?.let { return it }
+
+        // Query Docker for dynamic port mapping
+        val id = containerId ?: return config.port
+        val output = executor.execute(listOf("port", id.value, config.port.toString()))
+        val port = output.stdout.trim()
+            .substringAfterLast(":")
+            .toIntOrNull()
+            ?: config.port
+
+        cachedMappedPort = port
+        return port
+    }
+
+    /**
+     * Get the mapped host port (blocking version).
+     * For dynamic ports, queries Docker for the actual mapping.
+     */
+    fun getMappedPortBlocking(): Int {
+        // Return cached value if available
+        cachedMappedPort?.let { return it }
+
+        // Return static mapping if configured
+        config.hostPort?.let { return it }
+
+        // Query Docker for dynamic port mapping
+        val id = containerId ?: return config.port
+        val output = executor.executeBlocking(listOf("port", id.value, config.port.toString()))
+        val port = output.stdout.trim()
+            .substringAfterLast(":")
+            .toIntOrNull()
+            ?: config.port
+
+        cachedMappedPort = port
+        return port
+    }
+
+    /**
+     * Get the mapped host port (returns cached or static value only).
+     * Use discoverMappedPort() or getMappedPortBlocking() to query Docker for dynamic ports.
      */
     fun getMappedPort(): Int {
-        return mappedPort ?: config.hostPort ?: config.port
+        return cachedMappedPort ?: config.hostPort ?: config.port
     }
 
     override fun connectionString(): String {
