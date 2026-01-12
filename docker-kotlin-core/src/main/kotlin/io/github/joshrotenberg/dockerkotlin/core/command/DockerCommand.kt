@@ -4,6 +4,8 @@ import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
 import io.github.joshrotenberg.dockerkotlin.core.CommandOutput
 import io.github.joshrotenberg.dockerkotlin.core.StreamHandle
 import io.github.joshrotenberg.dockerkotlin.core.error.DockerException
+import io.github.joshrotenberg.dockerkotlin.core.retry.RetryExecutor
+import io.github.joshrotenberg.dockerkotlin.core.retry.RetryPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
 
@@ -64,6 +66,24 @@ interface DockerCommand<T> {
      * @return A preview of the command
      */
     fun preview(): CommandPreview
+
+    /**
+     * Execute the command asynchronously with retry support.
+     *
+     * @param policy The retry policy to use
+     * @return The command result
+     * @throws DockerException if all retries are exhausted
+     */
+    suspend fun executeWithRetry(policy: RetryPolicy = RetryPolicy.DEFAULT): T
+
+    /**
+     * Execute the command synchronously with retry support (blocking).
+     *
+     * @param policy The retry policy to use
+     * @return The command result
+     * @throws DockerException if all retries are exhausted
+     */
+    fun executeBlockingWithRetry(policy: RetryPolicy = RetryPolicy.DEFAULT): T
 }
 
 /**
@@ -197,6 +217,14 @@ abstract class AbstractDockerCommand<T>(
         }
 
         return output
+    }
+
+    override suspend fun executeWithRetry(policy: RetryPolicy): T {
+        return RetryExecutor.executeWithRetry(policy) { execute() }
+    }
+
+    override fun executeBlockingWithRetry(policy: RetryPolicy): T {
+        return RetryExecutor.executeWithRetryBlocking(policy) { executeBlocking() }
     }
 }
 
