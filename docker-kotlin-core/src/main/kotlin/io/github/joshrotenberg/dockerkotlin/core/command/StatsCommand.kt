@@ -9,14 +9,27 @@ import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
  *
  * Example usage:
  * ```kotlin
+ * // Get a single snapshot
  * val stats = StatsCommand("my-container").noStream().execute()
  * val stats = StatsCommand().all().noStream().execute()
+ *
+ * // Stream live stats (Kotlin)
+ * StatsCommand("my-container").asFlow().collect { stats ->
+ *     println(stats)
+ * }
+ *
+ * // Stream live stats (Java)
+ * try (StreamHandle handle = StatsCommand.builder("my-container").stream()) {
+ *     for (String stats : handle) {
+ *         System.out.println(stats);
+ *     }
+ * }
  * ```
  */
 class StatsCommand(
     private val containers: List<String> = emptyList(),
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<String>(executor) {
+) : AbstractStreamingDockerCommand<String>(executor) {
 
     constructor(container: String, executor: CommandExecutor = CommandExecutor()) :
             this(listOf(container), executor)

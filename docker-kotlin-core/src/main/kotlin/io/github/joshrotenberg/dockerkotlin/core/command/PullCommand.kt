@@ -9,13 +9,26 @@ import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
  *
  * Example usage:
  * ```kotlin
+ * // Pull and wait for completion
  * PullCommand("nginx:alpine").execute()
+ *
+ * // Stream pull progress (Kotlin)
+ * PullCommand("nginx:alpine").asFlow().collect { line ->
+ *     println(line)
+ * }
+ *
+ * // Stream pull progress (Java)
+ * try (StreamHandle handle = PullCommand.builder("nginx:alpine").stream()) {
+ *     for (String line : handle) {
+ *         System.out.println(line);
+ *     }
+ * }
  * ```
  */
 class PullCommand(
     private val image: String,
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<Unit>(executor) {
+) : AbstractStreamingDockerCommand<Unit>(executor) {
 
     private var allTags = false
     private var platform: String? = null
