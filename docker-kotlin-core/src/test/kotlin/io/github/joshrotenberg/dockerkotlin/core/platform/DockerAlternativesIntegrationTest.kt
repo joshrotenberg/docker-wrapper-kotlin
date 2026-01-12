@@ -17,7 +17,9 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.TestMethodOrder
+import org.junit.jupiter.api.condition.DisabledOnOs
 import org.junit.jupiter.api.condition.EnabledIf
+import org.junit.jupiter.api.condition.OS
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -98,6 +100,7 @@ class DockerAlternativesIntegrationTest {
 
     @Test
     @Order(1)
+    @DisabledOnOs(OS.WINDOWS, disabledReason = "Windows Docker cannot run Linux containers in CI")
     fun `pull image`() = runBlocking {
         val command = PullCommand(TEST_IMAGE, executor)
         command.execute()
@@ -128,6 +131,7 @@ class DockerAlternativesIntegrationTest {
 
     @Test
     @Order(4)
+    @DisabledOnOs(OS.WINDOWS, disabledReason = "Windows Docker cannot run Linux containers in CI")
     fun `run container and capture output`() = runBlocking {
         val containerId = RunCommand(TEST_IMAGE, executor)
             .name(TEST_CONTAINER)
@@ -140,6 +144,7 @@ class DockerAlternativesIntegrationTest {
 
     @Test
     @Order(5)
+    @DisabledOnOs(OS.WINDOWS, disabledReason = "Windows Docker cannot run Linux containers in CI")
     fun `run detached container and remove`() = runBlocking {
         // Run detached
         val containerId = RunCommand(TEST_IMAGE, executor)
