@@ -18,7 +18,7 @@ import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
  */
 class ComposeDownCommand(
     executor: CommandExecutor = CommandExecutor()
-) : AbstractComposeCommand<Unit>(executor) {
+) : AbstractComposeCommand<Unit, ComposeDownCommand>(executor) {
 
     private var removeOrphans = false
     private var removeVolumes = false
