@@ -8,11 +8,13 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         java: [17, 21]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -24,25 +26,34 @@ jobs:
           distribution: temurin
           cache: gradle
 
-      - name: Grant execute permission for gradlew
+      - name: Grant execute permission for gradlew (Unix)
+        if: runner.os != 'Windows'
         run: chmod +x gradlew
 
       - name: Build
-        run: ./gradlew build
+        run: ./gradlew build -x test
+        shell: bash
 
-      - name: Run tests
+      - name: Run unit tests
         run: ./gradlew test
+        shell: bash
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-java-${{ matrix.java }}
-          path: '**/build/reports/tests/'
+          name: test-results-${{ matrix.os }}-java-${{ matrix.java }}
+          path: "**/build/reports/tests/"
           retention-days: 7
 
   integration-tests:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        # Windows Docker requires special setup, so we skip it for now
+
+    runs-on: ${{ matrix.os }}
     needs: build
 
     steps:
@@ -58,6 +69,14 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Set up Docker (macOS)
+        if: runner.os == 'macOS'
+        uses: docker-practice/actions-setup-docker@master
+        timeout-minutes: 12
+
+      - name: Verify Docker is running
+        run: docker version
+
       - name: Run integration tests
         run: ./gradlew test
         env:
@@ -67,6 +86,20 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: integration-test-results
-          path: '**/build/reports/tests/'
+          name: integration-test-results-${{ matrix.os }}
+          path: "**/build/reports/tests/"
           retention-days: 7
+
+  # Summary job that depends on all others - useful for branch protection
+  ci-success:
+    runs-on: ubuntu-latest
+    needs: [build, integration-tests]
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ needs.build.result }}" != "success" ]] || [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi
+          echo "All jobs passed!"
