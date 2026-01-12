@@ -63,45 +63,49 @@ enum class ProgressType(val value: String) {
 
 /**
  * Base class for Docker Compose commands.
+ *
+ * Uses self-referential generic to enable fluent API method chaining
+ * that returns the concrete subclass type.
  */
-abstract class AbstractComposeCommand<T>(
+@Suppress("UNCHECKED_CAST")
+abstract class AbstractComposeCommand<T, Self : AbstractComposeCommand<T, Self>>(
     executor: CommandExecutor = CommandExecutor()
 ) : AbstractDockerCommand<T>(executor) {
 
     protected val config = ComposeConfig()
 
     /** Add a compose file. */
-    fun file(path: Path) = apply { config.files.add(path) }
+    fun file(path: Path): Self = apply { config.files.add(path) } as Self
 
     /** Add a compose file by string path. */
-    fun file(path: String) = apply { config.files.add(Path.of(path)) }
+    fun file(path: String): Self = apply { config.files.add(Path.of(path)) } as Self
 
     /** Set the project name. */
-    fun projectName(name: String) = apply { config.projectName = name }
+    fun projectName(name: String): Self = apply { config.projectName = name } as Self
 
     /** Set the project directory. */
-    fun projectDirectory(path: Path) = apply { config.projectDirectory = path }
+    fun projectDirectory(path: Path): Self = apply { config.projectDirectory = path } as Self
 
     /** Set the project directory by string path. */
-    fun projectDirectory(path: String) = apply { config.projectDirectory = Path.of(path) }
+    fun projectDirectory(path: String): Self = apply { config.projectDirectory = Path.of(path) } as Self
 
     /** Add a profile. */
-    fun profile(profile: String) = apply { config.profiles.add(profile) }
+    fun profile(profile: String): Self = apply { config.profiles.add(profile) } as Self
 
     /** Set the environment file. */
-    fun envFile(path: Path) = apply { config.envFile = path }
+    fun envFile(path: Path): Self = apply { config.envFile = path } as Self
 
     /** Set the environment file by string path. */
-    fun envFile(path: String) = apply { config.envFile = Path.of(path) }
+    fun envFile(path: String): Self = apply { config.envFile = Path.of(path) } as Self
 
     /** Enable compatibility mode. */
-    fun compatibility() = apply { config.compatibility = true }
+    fun compatibility(): Self = apply { config.compatibility = true } as Self
 
     /** Enable dry run mode. */
-    fun dryRun() = apply { config.dryRun = true }
+    fun dryRun(): Self = apply { config.dryRun = true } as Self
 
     /** Set progress output type. */
-    fun progress(progress: ProgressType) = apply { config.progress = progress }
+    fun progress(progress: ProgressType): Self = apply { config.progress = progress } as Self
 
     /**
      * Get the compose subcommand (e.g., "up", "down").

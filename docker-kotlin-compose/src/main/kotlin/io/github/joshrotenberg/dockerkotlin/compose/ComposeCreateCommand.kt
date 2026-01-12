@@ -3,40 +3,34 @@ package io.github.joshrotenberg.dockerkotlin.compose
 import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
 
 /**
- * Command to start compose services.
+ * Command to create containers for services.
  *
- * Equivalent to `docker compose up`.
+ * Equivalent to `docker compose create`.
  *
  * Example usage:
  * ```kotlin
- * ComposeUpCommand()
+ * ComposeCreateCommand()
  *     .file("docker-compose.yml")
- *     .projectName("myapp")
- *     .detach()
  *     .build()
+ *     .services("web", "db")
  *     .execute()
  * ```
  */
-class ComposeUpCommand(
+class ComposeCreateCommand(
     executor: CommandExecutor = CommandExecutor()
-) : AbstractComposeCommand<Unit, ComposeUpCommand>(executor) {
+) : AbstractComposeCommand<Unit, ComposeCreateCommand>(executor) {
 
-    private var detached = false
     private var buildImages = false
     private var forceRecreate = false
     private var noRecreate = false
     private var noBuild = false
-    private var noStart = false
     private var removeOrphans = false
-    private var wait = false
-    private var timeout: Int? = null
+    private var pull: PullPolicy? = null
+    private var quietPull = false
+    private val scale = mutableMapOf<String, Int>()
     private val services = mutableListOf<String>()
-    private var scale: MutableMap<String, Int> = mutableMapOf()
 
-    /** Run in detached mode. */
-    fun detach() = apply { detached = true }
-
-    /** Build images before starting containers. */
+    /** Build images before creating containers. */
     fun build() = apply { buildImages = true }
 
     /** Recreate containers even if configuration hasn't changed. */
@@ -48,36 +42,31 @@ class ComposeUpCommand(
     /** Don't build images. */
     fun noBuild() = apply { noBuild = true }
 
-    /** Don't start services. */
-    fun noStart() = apply { noStart = true }
-
     /** Remove containers for services not defined in the Compose file. */
     fun removeOrphans() = apply { removeOrphans = true }
 
-    /** Wait for services to be healthy. */
-    fun wait() = apply { wait = true }
+    /** Pull image policy. */
+    fun pull(policy: PullPolicy) = apply { pull = policy }
 
-    /** Shutdown timeout in seconds. */
-    fun timeout(seconds: Int) = apply { timeout = seconds }
-
-    /** Specify services to start. */
-    fun services(vararg services: String) = apply { this.services.addAll(services) }
+    /** Pull without printing progress. */
+    fun quietPull() = apply { quietPull = true }
 
     /** Scale a service to N instances. */
     fun scale(service: String, replicas: Int) = apply { scale[service] = replicas }
 
-    override fun subcommand(): String = "up"
+    /** Specify services to create. */
+    fun services(vararg services: String) = apply { this.services.addAll(services) }
+
+    override fun subcommand(): String = "create"
 
     override fun buildSubcommandArgs(): List<String> = buildList {
-        if (detached) add("--detach")
         if (buildImages) add("--build")
         if (forceRecreate) add("--force-recreate")
         if (noRecreate) add("--no-recreate")
         if (noBuild) add("--no-build")
-        if (noStart) add("--no-start")
         if (removeOrphans) add("--remove-orphans")
-        if (wait) add("--wait")
-        timeout?.let { add("--timeout"); add(it.toString()) }
+        pull?.let { add("--pull"); add(it.value) }
+        if (quietPull) add("--quiet-pull")
         scale.forEach { (service, replicas) ->
             add("--scale")
             add("$service=$replicas")
@@ -95,6 +84,15 @@ class ComposeUpCommand(
 
     companion object {
         @JvmStatic
-        fun builder(): ComposeUpCommand = ComposeUpCommand()
+        fun builder(): ComposeCreateCommand = ComposeCreateCommand()
     }
+}
+
+/**
+ * Pull policy for compose commands.
+ */
+enum class PullPolicy(val value: String) {
+    ALWAYS("always"),
+    MISSING("missing"),
+    NEVER("never")
 }

@@ -28,7 +28,7 @@ data class ComposeServiceInfo(
  */
 class ComposePsCommand(
     executor: CommandExecutor = CommandExecutor()
-) : AbstractComposeCommand<List<ComposeServiceInfo>>(executor) {
+) : AbstractComposeCommand<List<ComposeServiceInfo>, ComposePsCommand>(executor) {
 
     private var all = false
     private var quiet = false
