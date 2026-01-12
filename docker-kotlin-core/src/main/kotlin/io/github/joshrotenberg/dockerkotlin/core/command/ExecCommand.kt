@@ -106,7 +106,10 @@ class ExecCommand(
     }
 
     override suspend fun execute(): ExecOutput {
-        val output = executeRaw()
+        // Don't use executeRaw() as it throws on non-zero exit codes.
+        // For exec commands, non-zero exits are valid results (e.g., test commands).
+        val args = buildArgs() + rawArgs
+        val output = executor.execute(args, commandTimeout)
         return ExecOutput(
             stdout = output.stdout,
             stderr = output.stderr,
@@ -115,7 +118,10 @@ class ExecCommand(
     }
 
     override fun executeBlocking(): ExecOutput {
-        val output = executeRawBlocking()
+        // Don't use executeRawBlocking() as it throws on non-zero exit codes.
+        // For exec commands, non-zero exits are valid results (e.g., test commands).
+        val args = buildArgs() + rawArgs
+        val output = executor.executeBlocking(args, commandTimeout)
         return ExecOutput(
             stdout = output.stdout,
             stderr = output.stderr,
