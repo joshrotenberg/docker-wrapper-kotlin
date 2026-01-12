@@ -9,16 +9,29 @@ import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
  *
  * Example usage:
  * ```kotlin
+ * // Get events in a time range
  * val events = EventsCommand()
  *     .since("1h")
  *     .until("now")
  *     .filterType("container")
  *     .execute()
+ *
+ * // Stream events in real-time (Kotlin)
+ * EventsCommand().asFlow().collect { event ->
+ *     println(event)
+ * }
+ *
+ * // Stream events in real-time (Java)
+ * try (StreamHandle handle = EventsCommand.builder().stream()) {
+ *     for (String event : handle) {
+ *         System.out.println(event);
+ *     }
+ * }
  * ```
  */
 class EventsCommand(
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<String>(executor) {
+) : AbstractStreamingDockerCommand<String>(executor) {
 
     private val filters = mutableListOf<String>()
     private var format: String? = null

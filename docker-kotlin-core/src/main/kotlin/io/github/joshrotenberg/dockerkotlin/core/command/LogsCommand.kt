@@ -9,14 +9,27 @@ import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
  *
  * Example usage:
  * ```kotlin
+ * // Get all logs at once
  * val logs = LogsCommand("my-container").execute()
  * val logs = LogsCommand("my-container").tail(100).timestamps().execute()
+ *
+ * // Stream logs (Kotlin)
+ * LogsCommand("my-container").follow().asFlow().collect { line ->
+ *     println(line)
+ * }
+ *
+ * // Stream logs (Java)
+ * try (StreamHandle handle = LogsCommand.builder("my-container").follow().stream()) {
+ *     for (String line : handle) {
+ *         System.out.println(line);
+ *     }
+ * }
  * ```
  */
 class LogsCommand(
     private val container: String,
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<String>(executor) {
+) : AbstractStreamingDockerCommand<String>(executor) {
 
     private var details: Boolean = false
     private var follow: Boolean = false

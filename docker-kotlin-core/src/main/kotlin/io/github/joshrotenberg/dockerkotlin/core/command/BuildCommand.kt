@@ -9,15 +9,28 @@ import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
  *
  * Example usage:
  * ```kotlin
+ * // Build and get image ID
  * val imageId = BuildCommand(".")
  *     .tag("my-image:latest")
  *     .execute()
+ *
+ * // Stream build progress (Kotlin)
+ * BuildCommand(".").tag("my-image:latest").asFlow().collect { line ->
+ *     println(line)
+ * }
+ *
+ * // Stream build progress (Java)
+ * try (StreamHandle handle = BuildCommand.builder(".").tag("my-image:latest").stream()) {
+ *     for (String line : handle) {
+ *         System.out.println(line);
+ *     }
+ * }
  * ```
  */
 class BuildCommand(
     private val path: String = ".",
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<String>(executor) {
+) : AbstractStreamingDockerCommand<String>(executor) {
 
     private val tags = mutableListOf<String>()
     private var file: String? = null

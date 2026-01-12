@@ -1,7 +1,7 @@
 package io.github.joshrotenberg.dockerkotlin.core.command.service
 
 import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
-import io.github.joshrotenberg.dockerkotlin.core.command.AbstractDockerCommand
+import io.github.joshrotenberg.dockerkotlin.core.command.AbstractStreamingDockerCommand
 
 /**
  * Command to fetch the logs of a service or task.
@@ -10,15 +10,27 @@ import io.github.joshrotenberg.dockerkotlin.core.command.AbstractDockerCommand
  *
  * Example usage:
  * ```kotlin
+ * // Get logs at once
  * ServiceLogsCommand("my-service").executeBlocking()
  * ServiceLogsCommand("my-service").tail(100).timestamps().executeBlocking()
- * ServiceLogsCommand("my-service").follow().executeBlocking()
+ *
+ * // Stream logs (Kotlin)
+ * ServiceLogsCommand("my-service").follow().asFlow().collect { line ->
+ *     println(line)
+ * }
+ *
+ * // Stream logs (Java)
+ * try (StreamHandle handle = ServiceLogsCommand.builder("my-service").follow().stream()) {
+ *     for (String line : handle) {
+ *         System.out.println(line);
+ *     }
+ * }
  * ```
  */
 class ServiceLogsCommand(
     private val service: String,
     executor: CommandExecutor = CommandExecutor()
-) : AbstractDockerCommand<String>(executor) {
+) : AbstractStreamingDockerCommand<String>(executor) {
 
     private var details = false
     private var follow = false

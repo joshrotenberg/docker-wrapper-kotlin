@@ -6,9 +6,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.slf4j.LoggerFactory
+import java.io.BufferedReader
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
@@ -155,5 +160,32 @@ class CommandExecutor(
             process.waitFor() // Wait for process to actually terminate
             throw e
         }
+    }
+
+    /**
+     * Execute a Docker command with streaming output.
+     *
+     * Returns a StreamHandle that provides access to the command output
+     * as it becomes available. The caller is responsible for closing the
+     * handle when done.
+     *
+     * @param args Command arguments (without the 'docker' prefix)
+     * @return StreamHandle for reading output
+     */
+    fun executeStreaming(args: List<String>): StreamHandle {
+        val runtime = platformInfo?.runtime?.command ?: "docker"
+
+        logger.debug("Executing (streaming): {} {}", runtime, args.joinToString(" "))
+
+        val processBuilder = ProcessBuilder(listOf(runtime) + args)
+            .redirectErrorStream(false)
+
+        // Set environment variables from platform info
+        platformInfo?.environmentVars?.let { envVars ->
+            processBuilder.environment().putAll(envVars)
+        }
+
+        val process = processBuilder.start()
+        return StreamHandle.fromProcess(process)
     }
 }

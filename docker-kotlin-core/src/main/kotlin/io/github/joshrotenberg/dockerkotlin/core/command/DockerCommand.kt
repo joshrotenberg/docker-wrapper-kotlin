@@ -2,7 +2,9 @@ package io.github.joshrotenberg.dockerkotlin.core.command
 
 import io.github.joshrotenberg.dockerkotlin.core.CommandExecutor
 import io.github.joshrotenberg.dockerkotlin.core.CommandOutput
+import io.github.joshrotenberg.dockerkotlin.core.StreamHandle
 import io.github.joshrotenberg.dockerkotlin.core.error.DockerException
+import kotlinx.coroutines.flow.Flow
 import kotlin.time.Duration
 
 /**
@@ -77,6 +79,53 @@ data class CommandPreview(
 }
 
 /**
+ * Interface for commands that support streaming output.
+ *
+ * Commands implementing this interface can return output line-by-line
+ * as it becomes available, rather than waiting for completion.
+ */
+interface StreamingDockerCommand<T> : DockerCommand<T> {
+    /**
+     * Execute the command with streaming output.
+     *
+     * Returns a StreamHandle that provides access to output as it becomes
+     * available. The caller is responsible for closing the handle.
+     *
+     * Example usage (Kotlin):
+     * ```kotlin
+     * command.stream().use { handle ->
+     *     handle.asFlow().collect { line ->
+     *         println(line)
+     *     }
+     * }
+     * ```
+     *
+     * Example usage (Java):
+     * ```java
+     * try (StreamHandle handle = command.stream()) {
+     *     for (String line : handle) {
+     *         System.out.println(line);
+     *     }
+     * }
+     * ```
+     *
+     * @return StreamHandle for reading output
+     */
+    fun stream(): StreamHandle
+
+    /**
+     * Execute the command and return output as a Kotlin Flow.
+     *
+     * This is a convenience method that wraps stream().asFlow().
+     * The underlying process is automatically cleaned up when the
+     * flow collection completes or is cancelled.
+     *
+     * @return Flow of output lines
+     */
+    fun asFlow(): Flow<String>
+}
+
+/**
  * Abstract base class for Docker commands with common functionality.
  */
 abstract class AbstractDockerCommand<T>(
@@ -148,5 +197,23 @@ abstract class AbstractDockerCommand<T>(
         }
 
         return output
+    }
+}
+
+/**
+ * Abstract base class for Docker commands that support streaming output.
+ */
+abstract class AbstractStreamingDockerCommand<T>(
+    executor: CommandExecutor = CommandExecutor()
+) : AbstractDockerCommand<T>(executor), StreamingDockerCommand<T> {
+
+    override fun stream(): StreamHandle {
+        val args = buildArgs() + rawArgs
+        return executor.executeStreaming(args)
+    }
+
+    override fun asFlow(): Flow<String> {
+        val handle = stream()
+        return handle.asFlow()
     }
 }
