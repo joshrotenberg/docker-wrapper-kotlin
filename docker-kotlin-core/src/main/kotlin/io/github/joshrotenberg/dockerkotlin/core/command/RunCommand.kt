@@ -90,6 +90,47 @@ class RunCommand(
     private var init = false
     private var platform: String? = null
 
+    // High priority options
+    private val capsAdd = mutableListOf<String>()
+    private val capsDrop = mutableListOf<String>()
+    private val mounts = mutableListOf<String>()
+    private var healthCmd: String? = null
+    private var healthInterval: String? = null
+    private var healthTimeout: String? = null
+    private var healthRetries: Int? = null
+    private var healthStartPeriod: String? = null
+    private var noHealthcheck = false
+
+    // Medium priority options
+    private val addHosts = mutableListOf<String>()
+    private val devices = mutableListOf<String>()
+    private val dnsServers = mutableListOf<String>()
+    private val dnsSearch = mutableListOf<String>()
+    private var gpus: String? = null
+    private var logDriver: String? = null
+    private val logOpts = mutableMapOf<String, String>()
+    private var readOnly = false
+    private val securityOpts = mutableListOf<String>()
+    private val tmpfs = mutableListOf<String>()
+    private val ulimits = mutableListOf<String>()
+
+    // Low priority options
+    private var shmSize: String? = null
+    private var ipc: String? = null
+    private var pid: String? = null
+    private var uts: String? = null
+    private var stopSignal: String? = null
+    private var stopTimeout: Int? = null
+    private val sysctls = mutableMapOf<String, String>()
+    private var blkioWeight: Int? = null
+    private var cgroupParent: String? = null
+    private var cgroupns: String? = null
+    private var isolation: String? = null
+    private var macAddress: String? = null
+    private var oomKillDisable = false
+    private var oomScoreAdj: Int? = null
+    private var userns: String? = null
+
     /** Set the container name. */
     fun name(name: String) = apply { containerName = name }
 
@@ -192,6 +233,145 @@ class RunCommand(
     /** Set the platform (e.g., "linux/amd64"). */
     fun platform(platform: String) = apply { this.platform = platform }
 
+    // High priority options
+
+    /** Add a Linux capability. */
+    fun capAdd(capability: String) = apply { capsAdd.add(capability) }
+
+    /** Drop a Linux capability. */
+    fun capDrop(capability: String) = apply { capsDrop.add(capability) }
+
+    /** Attach a filesystem mount (more flexible than --volume). */
+    fun mount(mount: String) = apply { mounts.add(mount) }
+
+    /** Attach a bind mount. */
+    fun mountBind(source: String, target: String, readOnly: Boolean = false) = apply {
+        val ro = if (readOnly) ",readonly" else ""
+        mounts.add("type=bind,source=$source,target=$target$ro")
+    }
+
+    /** Attach a volume mount. */
+    fun mountVolume(source: String, target: String, readOnly: Boolean = false) = apply {
+        val ro = if (readOnly) ",readonly" else ""
+        mounts.add("type=volume,source=$source,target=$target$ro")
+    }
+
+    /** Attach a tmpfs mount. */
+    fun mountTmpfs(target: String, size: String? = null) = apply {
+        val sizeOpt = size?.let { ",tmpfs-size=$it" } ?: ""
+        mounts.add("type=tmpfs,target=$target$sizeOpt")
+    }
+
+    /** Set health check command. */
+    fun healthCmd(cmd: String) = apply { healthCmd = cmd }
+
+    /** Set health check interval. */
+    fun healthInterval(interval: String) = apply { healthInterval = interval }
+
+    /** Set health check timeout. */
+    fun healthTimeout(timeout: String) = apply { healthTimeout = timeout }
+
+    /** Set health check retries. */
+    fun healthRetries(retries: Int) = apply { healthRetries = retries }
+
+    /** Set health check start period. */
+    fun healthStartPeriod(period: String) = apply { healthStartPeriod = period }
+
+    /** Disable health check. */
+    fun noHealthcheck() = apply { noHealthcheck = true }
+
+    // Medium priority options
+
+    /** Add a custom host-to-IP mapping (host:ip). */
+    fun addHost(host: String, ip: String) = apply { addHosts.add("$host:$ip") }
+
+    /** Add a host device to the container. */
+    fun device(device: String) = apply { devices.add(device) }
+
+    /** Add a host device with container path. */
+    fun device(hostDevice: String, containerDevice: String) = apply {
+        devices.add("$hostDevice:$containerDevice")
+    }
+
+    /** Set custom DNS servers. */
+    fun dns(server: String) = apply { dnsServers.add(server) }
+
+    /** Set DNS search domains. */
+    fun dnsSearch(domain: String) = apply { dnsSearch.add(domain) }
+
+    /** Request GPU access (e.g., "all", "device=0"). */
+    fun gpus(gpus: String) = apply { this.gpus = gpus }
+
+    /** Set the logging driver. */
+    fun logDriver(driver: String) = apply { logDriver = driver }
+
+    /** Set a logging driver option. */
+    fun logOpt(key: String, value: String) = apply { logOpts[key] = value }
+
+    /** Mount root filesystem as read-only. */
+    fun readOnly() = apply { readOnly = true }
+
+    /** Add a security option. */
+    fun securityOpt(opt: String) = apply { securityOpts.add(opt) }
+
+    /** Mount a tmpfs directory. */
+    fun tmpfs(path: String) = apply { tmpfs.add(path) }
+
+    /** Mount a tmpfs directory with options. */
+    fun tmpfs(path: String, options: String) = apply { tmpfs.add("$path:$options") }
+
+    /** Set ulimit options. */
+    fun ulimit(name: String, soft: Long, hard: Long = soft) = apply {
+        ulimits.add("$name=$soft:$hard")
+    }
+
+    // Low priority options
+
+    /** Set shared memory size. */
+    fun shmSize(size: String) = apply { shmSize = size }
+
+    /** Set IPC namespace mode. */
+    fun ipc(mode: String) = apply { ipc = mode }
+
+    /** Set PID namespace mode. */
+    fun pid(mode: String) = apply { pid = mode }
+
+    /** Set UTS namespace mode. */
+    fun uts(mode: String) = apply { uts = mode }
+
+    /** Set stop signal. */
+    fun stopSignal(signal: String) = apply { stopSignal = signal }
+
+    /** Set stop timeout in seconds. */
+    fun stopTimeout(seconds: Int) = apply { stopTimeout = seconds }
+
+    /** Set a sysctl option. */
+    fun sysctl(key: String, value: String) = apply { sysctls[key] = value }
+
+    /** Set block I/O weight (10-1000). */
+    fun blkioWeight(weight: Int) = apply { blkioWeight = weight }
+
+    /** Set cgroup parent. */
+    fun cgroupParent(parent: String) = apply { cgroupParent = parent }
+
+    /** Set cgroup namespace mode. */
+    fun cgroupns(mode: String) = apply { cgroupns = mode }
+
+    /** Set container isolation technology. */
+    fun isolation(isolation: String) = apply { this.isolation = isolation }
+
+    /** Set container MAC address. */
+    fun macAddress(address: String) = apply { macAddress = address }
+
+    /** Disable OOM killer. */
+    fun oomKillDisable() = apply { oomKillDisable = true }
+
+    /** Tune container OOM preferences (-1000 to 1000). */
+    fun oomScoreAdj(adj: Int) = apply { oomScoreAdj = adj }
+
+    /** Set user namespace mode. */
+    fun userns(mode: String) = apply { userns = mode }
+
     override fun buildArgs(): List<String> = buildList {
         add("run")
 
@@ -220,6 +400,47 @@ class RunCommand(
         restartPolicy?.let { add("--restart"); add(it.value) }
         entrypoint?.let { add("--entrypoint"); add(it) }
         platform?.let { add("--platform"); add(it) }
+
+        // High priority options
+        capsAdd.forEach { add("--cap-add"); add(it) }
+        capsDrop.forEach { add("--cap-drop"); add(it) }
+        mounts.forEach { add("--mount"); add(it) }
+        healthCmd?.let { add("--health-cmd"); add(it) }
+        healthInterval?.let { add("--health-interval"); add(it) }
+        healthTimeout?.let { add("--health-timeout"); add(it) }
+        healthRetries?.let { add("--health-retries"); add(it.toString()) }
+        healthStartPeriod?.let { add("--health-start-period"); add(it) }
+        if (noHealthcheck) add("--no-healthcheck")
+
+        // Medium priority options
+        addHosts.forEach { add("--add-host"); add(it) }
+        devices.forEach { add("--device"); add(it) }
+        dnsServers.forEach { add("--dns"); add(it) }
+        dnsSearch.forEach { add("--dns-search"); add(it) }
+        gpus?.let { add("--gpus"); add(it) }
+        logDriver?.let { add("--log-driver"); add(it) }
+        logOpts.forEach { (k, v) -> add("--log-opt"); add("$k=$v") }
+        if (readOnly) add("--read-only")
+        securityOpts.forEach { add("--security-opt"); add(it) }
+        tmpfs.forEach { add("--tmpfs"); add(it) }
+        ulimits.forEach { add("--ulimit"); add(it) }
+
+        // Low priority options
+        shmSize?.let { add("--shm-size"); add(it) }
+        ipc?.let { add("--ipc"); add(it) }
+        pid?.let { add("--pid"); add(it) }
+        uts?.let { add("--uts"); add(it) }
+        stopSignal?.let { add("--stop-signal"); add(it) }
+        stopTimeout?.let { add("--stop-timeout"); add(it.toString()) }
+        sysctls.forEach { (k, v) -> add("--sysctl"); add("$k=$v") }
+        blkioWeight?.let { add("--blkio-weight"); add(it.toString()) }
+        cgroupParent?.let { add("--cgroup-parent"); add(it) }
+        cgroupns?.let { add("--cgroupns"); add(it) }
+        isolation?.let { add("--isolation"); add(it) }
+        macAddress?.let { add("--mac-address"); add(it) }
+        if (oomKillDisable) add("--oom-kill-disable")
+        oomScoreAdj?.let { add("--oom-score-adj"); add(it.toString()) }
+        userns?.let { add("--userns"); add(it) }
 
         add(image)
         addAll(command)
